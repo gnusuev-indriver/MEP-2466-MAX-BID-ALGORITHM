@@ -1,0 +1,114 @@
+---
+description: 
+globs: 
+alwaysApply: true
+---
+Используй эту инструкцию каждый раз, когда я прошу тебя делать что-то с git или github
+
+# Инструкция по работе с двумя GitHub аккаунтами
+
+## Текущая настройка
+
+1. Созданы два SSH-ключа:
+   - Рабочий: ~/.ssh/id_indriver (для inDriver)
+   - Личный: ~/.ssh/id_nsvgsh (для личного аккаунта)
+
+2. Настроен файл ~/.ssh/config:
+```
+# personal account
+Host nsvgsh.github.com
+HostName github.com
+PreferredAuthentications publickey
+IdentityFile ~/.ssh/id_nsvgsh
+
+# corporate account
+Host indriver.github.com
+HostName github.com
+PreferredAuthentications publickey
+IdentityFile ~/.ssh/id_indriver
+```
+
+## Основные команды
+
+### Клонирование репозиториев
+
+Для личного аккаунта:
+```bash
+git clone git@nsvgsh.github.com:nsvgsh/REPO_NAME.git
+```
+
+Для рабочего аккаунта:
+```bash
+git clone git@indriver.github.com:inDriver/REPO_NAME.git
+```
+
+### Настройка Git в репозитории
+
+Для личного репозитория:
+```bash
+git config user.name "Your Personal Name"
+git config user.email "gnusuev@nes.ru"
+```
+
+Для рабочего репозитория:
+```bash
+git config user.name "Georgii Nusuev"
+git config user.email "georgii.nusuev@indriver.com"
+```
+
+### Проверка настроек
+
+Проверить текущие настройки Git:
+```bash
+git config --list
+```
+
+Проверить активные SSH-ключи:
+```bash
+ssh-add -l
+```
+
+### Работа с удаленными репозиториями
+
+Добавить удаленный репозиторий для личного проекта:
+```bash
+git remote add origin git@nsvgsh.github.com:nsvgsh/REPO_NAME.git
+```
+
+Добавить удаленный репозиторий для рабочего проекта:
+```bash
+git remote add origin git@indriver.github.com:inDriver/REPO_NAME.git
+```
+
+### Проверка подключения
+
+Проверить подключение к личному GitHub:
+```bash
+ssh -T git@nsvgsh.github.com
+```
+
+Проверить подключение к рабочему GitHub:
+```bash
+ssh -T git@indriver.github.com
+```
+
+## Важные замечания
+
+1. При клонировании важно использовать правильный домен (nsvgsh.github.com или indriver.github.com)
+2. После клонирования проверяйте настройки git config в репозитории
+3. Если вы находитесь в уже склонированном репозитории, проверьте URL удаленного репозитория:
+   ```bash
+   git remote -v
+   ```
+   
+4. Если нужно изменить URL удаленного репозитория:
+   ```bash
+   git remote set-url origin git@correct-domain.github.com:owner/repo.git
+   ```
+
+## Удаление репозитория
+
+Чтобы удалить локальную копию репозитория:
+```bash
+rm -rf repository_name
+``` 

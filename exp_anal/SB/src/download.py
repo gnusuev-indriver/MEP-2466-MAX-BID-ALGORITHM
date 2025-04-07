@@ -583,6 +583,8 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
     ),
     bids_tbl AS (
         SELECT bid_data.* except(available_prices, bid_price),
+               multiplier_data.price_highrate_value / coalesce(multiplier_data.multiplier, 100) AS price_highrate_value,
+               multiplier_data.payment_price_value / coalesce(multiplier_data.multiplier, 100) AS price_start_value,
                bid_data.bid_price / coalesce(multiplier_data.multiplier, 100) AS bid_price_currency,
                ARRAY(SELECT price / coalesce(multiplier_data.multiplier, 100) FROM UNNEST(bid_data.available_prices) as price) AS available_prices_currency,
                (bid_data.bid_uuid = details_tbl.tender_uuid AND details_tbl.is_order_accepted = TRUE) AS is_bid_accepted,
@@ -591,15 +593,18 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
             LEFT JOIN details_tbl
                 ON bid_data.order_uuid = details_tbl.order_uuid
             LEFT JOIN (SELECT 
-                           city_id, 
-                           MAX(multiplier) AS multiplier
+                           uuid, 
+                           MAX(multiplier) AS multiplier,
+                           MAX(price_highrate_value) AS price_highrate_value,
+                           MAX(payment_price_value) AS payment_price_value
                        FROM `indriver-e6e40.ods_new_order_rh_cdc.order_global_strm`
                        WHERE true
-                         AND city_id IN (SELECT DISTINCT city_id FROM details_tbl)
+                         AND uuid IN (SELECT DISTINCT order_uuid FROM details_tbl)
                          AND DATE(created_at) >= DATE('{start_date}')
                          AND DATE(created_at) <= DATE('{stop_date}')
-                       GROUP BY city_id) AS multiplier_data
-                ON details_tbl.city_id = multiplier_data.city_id
+                       GROUP BY uuid) AS multiplier_data
+                       -- Если не нужны цены (а только мультиплаер, то можно группировать и фильтровать по city_id и будет быстрее)
+                ON details_tbl.order_uuid = multiplier_data.uuid
         WHERE true
     )
 
