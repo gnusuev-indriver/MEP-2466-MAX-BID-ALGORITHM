@@ -176,6 +176,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
                 driver_id                                                                   AS driver_id,
                 price_tender_usd                                                            AS price_tender_usd,
                 driveraccept_timestamp IS NOT NULL                                          AS is_order_accepted,
+                driverarrived_timestamp IS NOT NULL                                         AS is_order_arrived,
                 driverdone_timestamp IS NOT NULL                                            AS is_order_done,
                 tender_uuid IS NOT NULL                                                     AS is_order_with_tender,
                 price_start_usd = price_tender_usd                                          AS is_order_start_price_bid,
@@ -186,7 +187,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
                 ) AS first_row_by_accepted_tender,
                 fromlatitude                                                                AS fromlatitude,
                 fromlongitude                                                               AS fromlongitude,
-                -- duration_in_seconds / 60                                                    AS duration_in_min,
+                duration_in_seconds / 60                                                    AS duration_in_min,
                 distance_in_meters / 1000                                                   AS distance_in_km,
                 TIMESTAMP_DIFF(driverarrived_timestamp, driveraccept_timestamp, SECOND)     AS rta,
                 TIMESTAMP_DIFF(driverdone_timestamp, driverarrived_timestamp, SECOND)       AS rtr,
@@ -227,7 +228,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
             t1.price_start_usd                    AS price_start_usd,
             t1.fromlatitude                       AS fromlatitude,
             t1.fromlongitude                      AS fromlongitude,
-            -- t1.duration_in_min                    AS duration_in_min,
+            t1.duration_in_min                    AS duration_in_min,
             t1.distance_in_km                     AS distance_in_km,
             t1.rta                                AS rta,
             t1.rtr                                AS rtr,
@@ -239,6 +240,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
             t2.is_order_accepted_start_price_bid  AS is_order_accepted_start_price_bid,
             t2.is_order_done_start_price_bid      AS is_order_done_start_price_bid,
             t2.is_order_accepted                  AS is_order_accepted,
+            t2.is_order_arrived                   AS is_order_arrived,
             t2.is_order_done                      AS is_order_done,
             t3.price_done_usd                     AS price_done_usd,
             t3.rides_price_highrate_usd           AS rides_price_highrate_usd,
@@ -255,6 +257,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
                 MAX(is_order_start_price_bid AND is_order_accepted) AS is_order_accepted_start_price_bid,
                 MAX(is_order_start_price_bid AND is_order_done)     AS is_order_done_start_price_bid,
                 MAX(is_order_accepted)                              AS is_order_accepted,
+                MAX(is_order_arrived)                               AS is_order_arrived,
                 MAX(is_order_done)                                  AS is_order_done,
             FROM details_prepare
             GROUP BY 1
@@ -285,7 +288,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
         price_start_usd,
         fromlatitude,
         fromlongitude,
-        -- duration_in_min,
+        duration_in_min,
         distance_in_km,
         rta,
         rtr,
@@ -297,6 +300,7 @@ def download_order_data(start_date, stop_date, city_id, user_name, printBool=Fal
         is_order_accepted_start_price_bid,
         is_order_done_start_price_bid,
         is_order_accepted,
+        is_order_arrived,
         is_order_done,
         price_done_usd,
         rides_price_highrate_usd,
@@ -466,6 +470,7 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
                 driveraccept_timestamp                                                      AS bid_accept_local_timestamp,
                 TIMESTAMP(FORMAT_TIMESTAMP('%Y-%m-%d %H:%M:%S', driveraccept_timestamp), timezone) AS bid_accept_utc_timestamp,
                 driveraccept_timestamp IS NOT NULL                                          AS is_order_accepted,
+                driverarrived_timestamp IS NOT NULL                                         AS is_order_arrived,
                 driverdone_timestamp IS NOT NULL                                            AS is_order_done,
                 tender_uuid IS NOT NULL                                                     AS is_order_with_tender,
                 price_start_usd = price_tender_usd                                          AS is_order_start_price_bid,
@@ -477,7 +482,10 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
                 fromlatitude                                                                AS fromlatitude,
                 fromlongitude                                                               AS fromlongitude,
                 duration_in_seconds / 60                                                    AS duration_in_min,
-                distance_in_meters / 1000                                                   AS distance_in_km
+                distance_in_meters / 1000                                                   AS distance_in_km,
+                TIMESTAMP_DIFF(driverarrived_timestamp, driveraccept_timestamp, SECOND)     AS rta,
+                TIMESTAMP_DIFF(driverdone_timestamp, driverarrived_timestamp, SECOND)       AS rtr,
+                duration_in_seconds                                                         AS etr,
             FROM `indriver-e6e40.emart.incity_detail`
             WHERE true
                 AND created_date_order_part >= DATE_SUB(DATE('{start_date}'), INTERVAL 1 DAY)
@@ -502,12 +510,16 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
             t1.fromlongitude                      AS fromlongitude,
             t1.duration_in_min                    AS duration_in_min,
             t1.distance_in_km                     AS distance_in_km,
+            t1.rta                                AS rta,
+            t1.rtr                                AS rtr,
+            t1.etr                                AS etr,
             t2.tenders_count                      AS tenders_count,
             t2.is_order_with_tender               AS is_order_with_tender,
             t2.is_order_start_price_bid           AS is_order_start_price_bid,
             t2.is_order_accepted_start_price_bid  AS is_order_accepted_start_price_bid,
             t2.is_order_done_start_price_bid      AS is_order_done_start_price_bid,
             t2.is_order_accepted                  AS is_order_accepted,
+            t2.is_order_arrived                   AS is_order_arrived,
             t2.is_order_done                      AS is_order_done,
             t3.price_done_usd                     AS price_done_usd,
             t3.rides_price_highrate_usd           AS rides_price_highrate_usd,
@@ -522,6 +534,7 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
                 MAX(is_order_start_price_bid AND is_order_accepted) AS is_order_accepted_start_price_bid,
                 MAX(is_order_start_price_bid AND is_order_done)     AS is_order_done_start_price_bid,
                 MAX(is_order_accepted)                              AS is_order_accepted,
+                MAX(is_order_arrived)                               AS is_order_arrived,
                 MAX(is_order_done)                                  AS is_order_done
             FROM details_prepare
             GROUP BY 1
@@ -588,6 +601,8 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
                bid_data.bid_price / coalesce(multiplier_data.multiplier, 100) AS bid_price_currency,
                ARRAY(SELECT price / coalesce(multiplier_data.multiplier, 100) FROM UNNEST(bid_data.available_prices) as price) AS available_prices_currency,
                (bid_data.bid_uuid = details_tbl.tender_uuid AND details_tbl.is_order_accepted = TRUE) AS is_bid_accepted,
+               (bid_data.bid_uuid = details_tbl.tender_uuid AND details_tbl.is_order_arrived = TRUE) AS is_bid_arrived,
+               (bid_data.bid_uuid = details_tbl.tender_uuid AND details_tbl.is_order_done = TRUE) AS is_bid_done,
                details_tbl.*
         FROM bid_data
             LEFT JOIN details_tbl
@@ -652,3 +667,5 @@ def download_bid_data(start_date, stop_date, city_id, user_name, printBool=False
     # FROM `analytics-dev-333113.temp.df_tender_{user_name}_exp`
     # """
     return client.query(tmp_query).result().to_dataframe()
+
+

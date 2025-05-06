@@ -38,6 +38,7 @@ def prepare_recprice_data(df):
 #     distance_max = np.quantile(df['log_distance_in_km'], q=0.99)
 #     df = df[(df['log_duration_in_min'] > duration_min) & (df['log_duration_in_min'] < duration_max)]
 #     df = df[(df['log_distance_in_km'] > distance_min) & (df['log_distance_in_km'] < distance_max)]
+    df['log_duration_in_sec'] = df['log_duration_in_min'] * 60
     df['utc_dt'] = df['utc_recprice_dttm'].dt.date
     df['utc_hour'] = df['utc_recprice_dttm'].dt.hour
     df['utc_weekday'] = df['utc_recprice_dttm'].dt.weekday
@@ -63,6 +64,7 @@ def prepare_order_data(df):
 #     distance_max = np.quantile(df['distance_in_km'], q=0.99)
 #     df = df[(df['duration_in_min'] > duration_min) & (df['duration_in_min'] < duration_max)]
 #     df = df[(df['distance_in_km'] > distance_min) & (df['distance_in_km'] < distance_max)]
+    df['duration_sec'] = df['duration_in_min'] * 60
     df['utc_dt'] = df['utc_order_dttm'].dt.date
     df['utc_hour'] = df['utc_order_dttm'].dt.hour
     df['utc_weekday'] = df['utc_order_dttm'].dt.weekday
@@ -84,7 +86,7 @@ def prepare_order_data(df):
     return df
 
 
-def prepare_bid_data(df):
+def prepare_bid_data(df, t_param):
     df['group_name'] = df['bid_group_name']
 #     df = df[
 #         ~(df['duration_in_min'].isnull()) &
@@ -97,6 +99,37 @@ def prepare_bid_data(df):
 #     df = df[(df['duration_in_min'] > duration_min) & (df['duration_in_min'] < duration_max)]
 #     df = df[(df['distance_in_km'] > distance_min) & (df['distance_in_km'] < distance_max)]
 
+    # Store original row count
+    original_count = len(df)
+    
+    # Drop rows with missing values in required columns
+    df = df.dropna(
+        subset=['eta', 'duration_in_min', 'price_highrate_value', 'price_start_value', 
+                'available_prices_currency', 'is_bid_accepted', 'price_start_value']
+    )
+    
+    # Calculate number of dropped rows
+    dropped_count = original_count - len(df)
+    
+    # Print statistics
+    print(f"Total rows: {original_count}")
+    print(f"Dropped rows: {dropped_count} ({dropped_count/original_count:.2%})")
+    print(f"Remaining rows: {len(df)}")
+    
+    # Add new columns
+    df['price_diff'] = df.apply(
+        lambda row: (max(row['available_prices_currency']) - row['price_start_value']) / row['price_start_value']  
+        if isinstance(row['available_prices_currency'], (list, np.ndarray)) and len(row['available_prices_currency']) > 0
+        else 0, 
+        axis=1
+    )
+    df['unique_available_prices'] = df.apply(
+        lambda row: len(row['available_prices_currency'])
+        if isinstance(row['available_prices_currency'], (list, np.ndarray)) and len(row['available_prices_currency']) > 0
+        else 0, 
+        axis=1
+    )
+
     # Группируем по order_uuid и находим min_utc_bid_dttm
     min_times = df.groupby('order_uuid', as_index=False)['utc_bid_dttm'].min()
     min_times.rename(columns={'utc_bid_dttm': 'min_utc_bid_dttm'}, inplace=True)
@@ -107,6 +140,14 @@ def prepare_bid_data(df):
     df['time_1st_bid_to_accept_sec'] = (df['bid_accept_utc_timestamp'] - df['min_utc_bid_dttm']).dt.total_seconds()
     # Удаляем временные переменные
     del min_times
+
+    df['bid2rec'] = df['bid_price_currency'] / df['price_highrate_value']
+    df['max_eta_t'] = df['eta'].clip(lower=t_param)
+    df['bidMPH'] = df['bid_price_currency'] / (df['max_eta_t'] + df['etr'])
+    df['max_rec_start_price'] = df[['price_start_value', 'price_highrate_value']].max(axis=1)
+    df['recMPH'] = df['max_rec_start_price'] / (t_param + df['etr'])
+    df.drop('max_rec_start_price', axis=1, inplace=True)
+    df['bidMPH2recMPH'] = df['bidMPH'] / df['recMPH']
 
     df['utc_dt'] = df['utc_order_dttm'].dt.date
     df['utc_hour'] = df['utc_order_dttm'].dt.hour
@@ -140,7 +181,9 @@ def get_orders_with_recprice_df(df_left, df_right):
     return df_full
 
 
-def determine_bid_algorithm(row, t: float, alpha: float) -> str:
+def determine_bid_algorithm(row, t: float, alpha: float, 
+                          groups={"control":"Control", "treatment":"A"},
+                          coefficients_to_restore: list = [0.1, 0.2, 0.3]) -> str:
     """
     Определяет алгоритм ставок для каждой строки данных.
     
@@ -170,12 +213,12 @@ def determine_bid_algorithm(row, t: float, alpha: float) -> str:
     duration_seconds = row['duration_in_min'] * 60
     
     # Шаг 1: вычисляем max_bid
-    # max_price = max(row['price_highrate_value'], row['price_start_value'])
     max_price = np.nanmax([row['price_highrate_value'], row['price_start_value']])
     try:
         max_bid = int((1 + alpha) * max_price * (duration_seconds + eta) / (duration_seconds + t))
     except:
         print(f"""
+          maxBid compute error
           max_price: {max_price}
           duration_seconds: {duration_seconds}
           eta: {eta}
@@ -183,14 +226,18 @@ def determine_bid_algorithm(row, t: float, alpha: float) -> str:
           """)
     
     # Шаг 2 и 3: проверяем available_prices
-    try:
+    if row['group_name'] == groups['treatment']:
+        available_prices = row['price_start_value'] * (1 + np.array(coefficients_to_restore))
+    else:
         available_prices = row['available_prices_currency']
+
+    try:
         if max(available_prices) <= max_bid:
             return 'algo_default', {'eta': eta, 'duration_seconds': duration_seconds, 'max_price': max_price, 'max_bid': max_bid, 't': t, 'alpha': alpha, 'available_prices': available_prices}
         else:
-            return 'algo_bid_mph', {'eta': eta, 'duration_seconds': duration_seconds, 'max_price': max_price, 'max_bid': max_bid, 't': t, 'alpha': alpha, 'available_prices': available_prices}
+            return 'algo_bidmph', {'eta': eta, 'duration_seconds': duration_seconds, 'max_price': max_price, 'max_bid': max_bid, 't': t, 'alpha': alpha, 'available_prices': available_prices}
     except:
-        return 'error'
+        return 'algo assignment error'
 
 
 def add_algo_name_new(df: pd.DataFrame, t: float, alpha: float) -> pd.DataFrame:
