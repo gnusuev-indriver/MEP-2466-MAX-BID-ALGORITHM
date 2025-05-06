@@ -38,5 +38,9 @@ Thumbs.db
 # Data files
 *.csv
 *.pqt
+*.png
+*.pdf
+*.html
+*.json
 exp_anal/*/results/data/
 exp_anal/results/data/ 
