@@ -42,3 +42,8 @@ Thumbs.db
 *.pdf
 *.html
 *.json
+
+# Specific files
+exp_anal/SB/SB_Veracruz.ipynb
+exp_anal/SB/SB_ Curitiba.ipynb
+exp_anal/SB/SB_Alto_Hospicio.ipynb
