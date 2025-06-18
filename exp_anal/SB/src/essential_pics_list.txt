@@ -1,0 +1,24 @@
+bidMPH2recMPH_all_bids
+bid2rec_all_bids
+bid_price_currency_all_bids
+bids_per_order_with_bid
+Accepts_SP per ordersTOTAL_Rel_Diff
+Accepts_Op1 per ordersTOTAL_Rel_Diff
+Accepts_Op2 per ordersTOTAL_Rel_Diff
+Accepts_Op3 per ordersTOTAL_Rel_Diff
+Accepts per ordersTOTAL_Rel_Diff
+Bids_SP per ordersTOTAL_Rel_Diff
+Bids_Op1 per ordersTOTAL_Rel_Diff
+Bids_Op2 per ordersTOTAL_Rel_Diff
+Bids_Op3 per ordersTOTAL_Rel_Diff
+bids per orderTOTAL_Rel_Diff
+GMV_SP per ordersTOTAL_Rel_Diff
+GMV_Op1 per ordersTOTAL_Rel_Diff
+GMV_Op2 per ordersTOTAL_Rel_Diff
+GMV_Op3 per ordersTOTAL_Rel_Diff
+GMV per ordersTotal_Rel_Diff
+duration_sec_orders_with_tender
+eta_all_bids
+bids_dist_A
+bids_dist_Control
+bids_dist_Rel_Diff

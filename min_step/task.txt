@@ -1,0 +1,1 @@
+Объясни что происходит в файлах /Users/georgiinusuev/PycharmProjects/work/badbids/min_step/algorithm.go и /Users/georgiinusuev/PycharmProjects/work/badbids/min_step/custom_steps.go
